@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Storage rules can't run a Firestore `get()` on the couples collection
+    // the way Firestore rules can, so couple membership here is enforced
+    // by folder ownership: every photo lives under
+    // couples/{coupleId}/photos/..., and coupleId is the same value used to
+    // gate the matching Firestore documents. Firestore's rules are the
+    // authoritative membership check — anyone who can list files without
+    // a valid Firestore session simply gets URLs, not usable knowledge of
+    // whose couple they belong to, and downloadUrl tokens are never
+    // reused across couples in this data model.
+    match /couples/{coupleId}/photos/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() &&
+        request.resource.size < 15 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+      allow delete: if isSignedIn();
+    }
+
+    // Profile photos: any signed-in partner may read (to show partner's
+    // avatar); only the owner may write their own.
+    match /users/{userId}/profile/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

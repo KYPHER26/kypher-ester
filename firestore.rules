@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMe(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // A couple's two members are its only readers/writers. We look the
+    // requester up in /couples/{coupleId} rather than trusting a coupleId
+    // claim on the request, so nobody can read another couple's data by
+    // guessing or spoofing a coupleId field.
+    function isCoupleMember(coupleId) {
+      let couple = get(/databases/$(database)/documents/couples/$(coupleId)).data;
+      return isSignedIn() &&
+        (request.auth.uid == couple.partner1Id || request.auth.uid == couple.partner2Id);
+    }
+
+    function isAuthor(resourceData) {
+      return isSignedIn() && request.auth.uid == resourceData.authorId;
+    }
+
+    function isUploader(resourceData) {
+      return isSignedIn() && request.auth.uid == resourceData.uploaderId;
+    }
+
+    // ----- users -----
+    match /users/{userId} {
+      allow read: if isSignedIn(); // needed to look up partner's name/photo
+      allow create: if isMe(userId);
+      // Users may update their own profile fields, but never grant
+      // themselves membership in someone else's couple.
+      allow update: if isMe(userId) &&
+        (!('coupleId' in request.resource.data) ||
+          request.resource.data.coupleId == resource.data.coupleId ||
+          !('coupleId' in resource.data));
+      allow delete: if false;
+    }
+
+    // ----- couples -----
+    match /couples/{coupleId} {
+      allow read: if isCoupleMember(coupleId);
+      // Created once, automatically, when both partner accounts exist.
+      allow create: if isSignedIn() &&
+        (request.auth.uid == request.resource.data.partner1Id ||
+         request.auth.uid == request.resource.data.partner2Id);
+      allow update: if isCoupleMember(coupleId) &&
+        request.resource.data.partner1Id == resource.data.partner1Id &&
+        request.resource.data.partner2Id == resource.data.partner2Id;
+      allow delete: if false;
+    }
+
+    // ----- memories -----
+    match /memories/{memoryId} {
+      allow read: if isCoupleMember(resource.data.coupleId);
+      allow create: if isCoupleMember(request.resource.data.coupleId) &&
+        isAuthor(request.resource.data);
+      allow update: if isCoupleMember(resource.data.coupleId);
+      allow delete: if isCoupleMember(resource.data.coupleId) && isAuthor(resource.data);
+    }
+
+    // ----- photos -----
+    match /photos/{photoId} {
+      allow read: if isCoupleMember(resource.data.coupleId);
+      allow create: if isCoupleMember(request.resource.data.coupleId) &&
+        isUploader(request.resource.data);
+      allow update: if isCoupleMember(resource.data.coupleId);
+      allow delete: if isCoupleMember(resource.data.coupleId) && isUploader(resource.data);
+    }
+
+    // ----- comments -----
+    match /comments/{commentId} {
+      allow read: if isCoupleMember(resource.data.coupleId);
+      allow create: if isCoupleMember(request.resource.data.coupleId) &&
+        isAuthor(request.resource.data);
+      allow update: if false;
+      allow delete: if isCoupleMember(resource.data.coupleId) && isAuthor(resource.data);
+    }
+
+    // ----- reactions -----
+    match /reactions/{reactionId} {
+      allow read: if isCoupleMember(resource.data.coupleId);
+      allow create, update: if isCoupleMember(request.resource.data.coupleId) &&
+        request.auth.uid == request.resource.data.userId;
+      allow delete: if isCoupleMember(resource.data.coupleId) &&
+        request.auth.uid == resource.data.userId;
+    }
+
+    // ----- notifications -----
+    match /notifications/{notificationId} {
+      allow read: if isMe(resource.data.recipientId);
+      allow create: if isCoupleMember(request.resource.data.coupleId) &&
+        request.auth.uid == request.resource.data.senderId;
+      // Recipient may only flip `read`, nothing else.
+      allow update: if isMe(resource.data.recipientId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isMe(resource.data.recipientId);
+    }
+
+    // ----- milestones (Our Story) -----
+    match /milestones/{milestoneId} {
+      allow read: if isCoupleMember(resource.data.coupleId);
+      allow create, update: if isCoupleMember(request.resource.data.coupleId);
+      allow delete: if isCoupleMember(resource.data.coupleId);
+    }
+  }
+}
