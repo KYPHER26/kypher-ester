@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-ink: #14131C;
+  --color-ink-light: #1D1B29;
+  --color-ink-border: #2A2736;
+  --color-paper: #F7F3EE;
+  --color-paper-dim: #EDE7DE;
+  --color-muted: #9C93A8;
+}
+
+html.light {
+  --color-ink: #F7F3EE;
+  --color-ink-light: #FFFFFF;
+  --color-ink-border: #E4DCD1;
+  --color-paper: #241F2E;
+  --color-paper-dim: #3A3348;
+  --color-muted: #7A7189;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-ink text-paper font-body antialiased;
+  }
+  ::selection {
+    @apply bg-rose/30;
+  }
+  :focus-visible {
+    outline: 2px solid theme('colors.rose.DEFAULT');
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .heading-serif {
+    font-family: 'Fraunces', serif;
+    font-feature-settings: 'ss01' 1;
+  }
+
+  .divider-line {
+    height: 1px;
+    background: linear-gradient(to right, transparent, theme('colors.ink.border'), transparent);
+  }
+
+  .heartbeat-once {
+    animation: heartbeat 1.1s ease-in-out 1;
+  }
+
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.08); }
+    45% { transform: scale(0.98); }
+    60% { transform: scale(1.05); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .heartbeat-once { animation: none; }
+    html { scroll-behavior: auto; }
+  }
+}
