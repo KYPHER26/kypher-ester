@@ -1,4 +1,4 @@
-import type { TouchEvent } from 'react';
+import type { TouchEvent as ReactTouchEvent } from 'react';
 import { useState } from 'react';
 import { Photo } from '../types';
 
@@ -64,7 +64,7 @@ function PhotoViewer({
 }) {
   const photo = photos[index];
 
-  function handleTouch(e: TouchEvent) {
+  function handleTouch(e: ReactTouchEvent) {
     const startX = e.changedTouches[0].clientX;
     const handler = (ev: TouchEvent) => {
       const endX = ev.changedTouches[0].clientX;
@@ -107,4 +107,4 @@ function PhotoViewer({
       )}
     </div>
   );
-}
+          }
