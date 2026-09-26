@@ -42,6 +42,7 @@ export default function AddMemory() {
   const [removedPhotoIds, setRemovedPhotoIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Load the existing memory when editing.
   useEffect(() => {
@@ -81,7 +82,18 @@ export default function AddMemory() {
   }
 
   async function save() {
-    if (!user || !couple || !title.trim()) return;
+    setSaveError(null);
+    if (!user) {
+      setSaveError("You're not logged in — please refresh and log in again.");
+      return;
+    }
+    if (!couple) {
+      setSaveError(
+        "Your shared space isn't ready yet. This means both partners haven't finished signing up, or the couple record failed to create — check that both accounts exist in Firebase Authentication, then refresh this page."
+      );
+      return;
+    }
+    if (!title.trim()) return;
     setSaving(true);
     try {
       const payload = {
@@ -102,7 +114,6 @@ export default function AddMemory() {
       if (isEditing && editingId) {
         memoryId = editingId;
         setProgress('Saving changes...');
-        // Delete any photos the user removed from this edit.
         for (const photoId of removedPhotoIds) {
           const photo = existingPhotos.find((p) => p.photoId === photoId) ||
             (await getPhotosForMemory(editingId)).find((p) => p.photoId === photoId);
@@ -141,6 +152,9 @@ export default function AddMemory() {
       }
 
       navigate('/timeline');
+    } catch (err: any) {
+      console.error('Save memory failed:', err);
+      setSaveError(err?.message || 'Something went wrong while saving. Please try again.');
     } finally {
       setSaving(false);
       setProgress(null);
@@ -317,6 +331,12 @@ export default function AddMemory() {
           Mark as ❤️ Special Memory
         </label>
 
+        {saveError && (
+          <p className="text-sm text-rose bg-rose/10 border border-rose/30 rounded-xl px-4 py-3">
+            ⚠️ {saveError}
+          </p>
+        )}
+
         <button
           onClick={save}
           disabled={!title.trim() || saving}
@@ -345,4 +365,4 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </div>
   );
-}
+    }
